@@ -10,10 +10,12 @@ target_path = input("请输入excel文件：")
 classify_by = input("请输入分类统计依据（project/tablet），留空表示不分类：").strip().lower()
 cut_num=input("请输入过滤低质量数据的STR_AVG阈值")
 sutter_cut_num=input("请输入过滤stutter高占比数阈值")
+doublet_precent=input("是否计算STR双峰比？ y/n").strip().lower()
 if cut_num == '':
     cut_num = 0
 if sutter_cut_num=='':
     sutter_cut_num=0
+
 processor = ExcelDataProcessor(target_path)
 df, df_geno, df_genoDp, df_noDP = processor.batch_read_excel()
 
@@ -24,6 +26,7 @@ def calculate_statistics(subdf,project_tablet_name):
     """
     global reads_df
     reads_df = pd.DataFrame()
+    doublet_avg=0
     if classify_by in ["project","tablet"]:
         subdf =  df[df[classify_by] == project_tablet_name]
     else:
@@ -33,7 +36,14 @@ def calculate_statistics(subdf,project_tablet_name):
         return {'project/tablet': project_tablet_name}
     subdf = subdf[subdf['STR_AVG'] >= int(cut_num)]
     subdf = subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)]
-
+    if doublet_precent=="y":
+        doublet_index = subdf.index
+        for idx in doublet_index:
+            avg = processor.process_doublet_precent(idx)
+            doublet_avg += avg
+        doublet_avg=round(doublet_avg/(len(doublet_index)),2)
+    else:
+        doublet_avg=None
     # A_Typed / auto_loci_typed 平均值
     if 'A_Typed' in subdf.columns:
         normal_avg = round(subdf['A_Typed'].mean(), 2)
@@ -126,6 +136,7 @@ def calculate_statistics(subdf,project_tablet_name):
         '核心Y（平均）': y_core_avg,
         '单个样本reads(M)': sample_reads_avg,
         'STR reads占比': effect_reads_avg_percentage,
+        '常STR双峰比':str(doublet_avg.mean())+'%',
         'STR.AVG': str_avg,
         'STR.STD': str_std,
         'A.AVG': A_avg,
@@ -168,7 +179,9 @@ if classify_by == "project":
     for proj in unique_projects:
         # 对 excel_dfs[0] 进行切片，筛选出当前 project 的数据
         df_slice = processor.df[processor.df["project"] == proj]
+        df_slice = df_slice[pd.to_numeric(df_slice.index, errors="coerce") < 1000]
         # 调用 calculate_statistics 对当前切片进行统计计算
+
         stats_result = calculate_statistics(df_slice,proj)
         df_result_sub = pd.DataFrame([stats_result])
         if df_result_sub.empty:
@@ -183,6 +196,7 @@ elif classify_by == "tablet":
     for proj in unique_projects:
         # 对 excel_dfs[0] 进行切片，筛选出当前 project 的数据
         df_slice = processor.df[processor.df["tablet"] == proj]
+        df_slice = df_slice[pd.to_numeric(df_slice.index, errors="coerce") < 1000]
         # 调用 calculate_statistics 对当前切片进行统计计算
         stats_result = calculate_statistics(df_slice,proj)
         df_result_sub = pd.DataFrame([stats_result])

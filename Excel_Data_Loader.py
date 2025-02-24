@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
-
+import glob
+import os
+import re
 
 class ExcelDataProcessor:
     def __init__(self, file_path):
@@ -18,6 +20,7 @@ class ExcelDataProcessor:
             df_geno = pd.read_excel(self.file_path, sheet_name="geno", header=0, index_col=0)
             df_genoDp = pd.read_excel(self.file_path, sheet_name="genoDp", header=0, index_col=0)
             df_noDP = pd.read_excel(self.file_path, sheet_name="noDP", header=0, index_col=0)
+            #df_report= pd.read_excel(self.file_path, sheet_name="常染色体STR", header=0, index_col=0)
 
             return df, df_geno, df_genoDp, df_noDP
         except Exception as e:
@@ -102,3 +105,56 @@ class ExcelDataProcessor:
             df_results = pd.DataFrame(file_data)
 
         return df_results
+
+    def process_doublet_precent(self, idx):
+        """
+        1) 在当前目录及所有子目录中查找包含“_idx_”的 .xlsx 文件；
+        2) 读取 sheet="常染色体STR", header=5；
+        3) 提取“双峰比”列，合并到一个 DataFrame；
+        4) 去除值为100%和空值的行，将剩余值转为float；
+        5) 计算平均值并返回。
+        """
+        root_dir = os.getcwd()
+        pattern = os.path.join(root_dir, "**", f"*_{idx}_*.xlsx")
+        excel_files = glob.glob(pattern, recursive=True)
+
+        if not excel_files:
+            print(f"未在 {root_dir} 的子目录中找到包含“_idx_”的 Excel 文件")
+            return None
+
+        df_list = []
+        try:
+            # 读取“常染色体STR”表，表头行为第5行
+            df_temp = pd.read_excel(excel_files[0], sheet_name="常染色体STR", header=5)
+
+            # 如果“双峰比”列不存在，则跳过
+            if "双峰比" not in df_temp.columns:
+                print(f"[警告] 文件 {excel_files} 中未找到“双峰比”列，跳过。")
+                return None
+
+            # 只取“双峰比”列，也可视情况取其他列
+            df_temp = df_temp["双峰比"].copy()
+            # 添加文件名列，便于后续追踪来源
+            #df_temp["来源文件"] = os.path.basename(excel_files)
+        except Exception as e:
+            print(f"[错误] 读取文件 {excel_files} 时出错: {e}")
+
+        # df_merged = pd.concat(df_list, ignore_index=True)
+        #
+        # # 去除空值
+        # df_merged.dropna(inplace=True)
+
+        # 将“双峰比”列转换为字符串，去除百分号，并转换为浮点数
+        # df_merged["双峰比_clean"] = pd.to_numeric(
+        #     df_list["双峰比"].astype(str).str.replace("%", "").str.strip(),
+        #     errors="coerce"
+        # )
+
+        df_temp=df_temp.str.rstrip('%').astype(float)
+
+        # 计算平均值
+        avg_doublet = df_temp.mean()
+        return avg_doublet
+
+
+

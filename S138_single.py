@@ -10,6 +10,7 @@ target_path = input("请输入excel文件：")
 classify_by = input("请输入分类统计依据（project/tablet），留空表示不分类：").strip().lower()
 cut_num=input("请输入过滤低质量数据的STR_AVG阈值")
 sutter_cut_num=input("请输入过滤stutter高占比数阈值")
+doublet_precent=input("是否计算STR双峰比？ y/n").strip().lower()
 if cut_num == '':
     cut_num = 0
 if sutter_cut_num=='':
@@ -24,16 +25,24 @@ def calculate_statistics(df1,project_tablet_name):
     """
     global reads_df
     reads_df = pd.DataFrame()
+    doublet_avg=0
     if classify_by in ["project","tablet"]:
         subdf =  df1[df1[classify_by] == project_tablet_name]
     else:
         subdf=df1 #考虑阈值为空情况
 
-    if subdf.empty or subdf[subdf['STR均值'] >= int(cut_num)].empty or subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)].empty:
+    if subdf.empty or subdf[subdf['STR均值'] >= int(cut_num)] or subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)]:
         return {'project/tablet': project_tablet_name}
     subdf = subdf[subdf['STR均值'] >= int(cut_num)]
     subdf = subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)]
-
+    if doublet_precent=="y":
+        doublet_index = subdf.index
+        for idx in doublet_index:
+            avg = processor.process_doublet_precent(idx)
+            doublet_avg += avg
+        doublet_avg=round(doublet_avg/(len(doublet_index)),2)
+    else:
+        doublet_avg=None
     # A_Typed / auto_loci_typed 平均值
     if 'A_Typed' in subdf.columns:
         normal_avg = round(subdf['A_Typed'].mean(), 2)
@@ -117,6 +126,7 @@ def calculate_statistics(df1,project_tablet_name):
         '常位点（平均）': normal_avg,
         '单个样本reads(M)': sample_reads_avg,
         'STR reads占比': effect_reads_avg_percentage,
+        '常STR双峰比': str(doublet_avg.mean()) + '%',
         'STR.AVG': str_avg,
         'STR.STD': str_std,
         'A.AVG': A_avg,

@@ -150,8 +150,8 @@ class ExcelDataProcessor:
         #     errors="coerce"
         # )
 
-        df_temp=df_temp.str.rstrip('%').astype(float)
-
+        df_temp = df_temp.fillna('0').str.rstrip('%').astype(float)
+        df_temp = df_temp[df_temp != 100]
         # 计算平均值
         avg_doublet = df_temp.mean()
         return avg_doublet

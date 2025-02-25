@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import numpy as np
 import warnings
 from Excel_Data_Loader import ExcelDataProcessor
 
@@ -179,7 +178,6 @@ if classify_by == "project":
         df_slice = processor.df[processor.df["project"] == proj]
         df_slice = df_slice[pd.to_numeric(df_slice.index, errors="coerce") < 1000]
         # 调用 calculate_statistics 对当前切片进行统计计算
-        print(df_slice)
         stats_result = calculate_statistics(df_slice,proj)
         df_result_sub = pd.DataFrame([stats_result])
         if df_result_sub.empty:

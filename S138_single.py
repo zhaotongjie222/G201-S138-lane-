@@ -25,9 +25,7 @@ def calculate_statistics(subdf,project_tablet_name):
     # global reads_df
     doublet_avg=0
     if classify_by in ["project","tablet"]:
-        subdf =  df[df[classify_by] == project_tablet_name]
-    else:
-        subdf=df #考虑阈值为空情况
+        subdf =  subdf[subdf[classify_by] == project_tablet_name]
 
     if subdf.empty or subdf[subdf['STR均值'] >= int(cut_num)].empty or subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)].empty:
         return {f'{classify_by}': project_tablet_name}

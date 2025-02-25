@@ -61,8 +61,8 @@ class ExcelDataProcessor:
             unique_values = self.df[classify_by].unique()
             for val in unique_values:
                 idx = reads_df[self.df[classify_by] == val].index
-                print(f'indx是+{idx}')
-                print(f'reads_df是{reads_df}')
+                #print(f'indx是+{idx}')
+                #print(f'reads_df是{reads_df}')
                 df_geno_slice = self.df_geno.loc[idx]
                 df_genoDp_slice = self.df_genoDp.loc[idx]
                 df_noDP_slice = self.df_noDP.loc[idx]
@@ -75,7 +75,7 @@ class ExcelDataProcessor:
 
                 geno_sample_columns = df_geno_slice.columns[4:4 + len(shared_columns)]
                 missing_rate = (1 - df_geno_slice[geno_sample_columns].isnull().mean()).values
-                if missing_rate.all(None) or missing_rate.all(0):
+                if missing_rate.size == 0 or np.all(missing_rate == 0):
                     continue
                 file_data = {
                     '基因组': shared_columns,

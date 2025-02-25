@@ -17,24 +17,24 @@ if sutter_cut_num=='':
     sutter_cut_num=0
 processor = ExcelDataProcessor(target_path)
 df, df_geno, df_genoDp, df_noDP = processor.batch_read_excel()
-
-def calculate_statistics(df1,project_tablet_name):
+def calculate_statistics(subdf,project_tablet_name):
     """
     计算统计数据，并根据用户输入按 project 或 tablet 分类统计（如果用户输入有效且对应列存在）
     如果分类，则返回一个字典列表，每个字典对应一个组；否则返回一个单一的统计结果字典。
     """
-    global reads_df
-    reads_df = pd.DataFrame()
+    # global reads_df
     doublet_avg=0
     if classify_by in ["project","tablet"]:
-        subdf =  df1[df1[classify_by] == project_tablet_name]
+        subdf =  df[df[classify_by] == project_tablet_name]
     else:
-        subdf=df1 #考虑阈值为空情况
+        subdf=df #考虑阈值为空情况
 
-    if subdf.empty or subdf[subdf['STR均值'] >= int(cut_num)] or subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)]:
-        return {'project/tablet': project_tablet_name}
+    if subdf.empty or subdf[subdf['STR均值'] >= int(cut_num)].empty or subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)].empty:
+        return {f'{classify_by}': project_tablet_name}
+
     subdf = subdf[subdf['STR均值'] >= int(cut_num)]
     subdf = subdf[subdf['stutter高占比数'] <= int(sutter_cut_num)]
+
     if doublet_precent=="y":
         doublet_index = subdf.index
         for idx in doublet_index:
@@ -92,16 +92,16 @@ def calculate_statistics(df1,project_tablet_name):
     average_value_A = subdf.loc[:, 'CSF1PO':'vWA'].mean(axis=1)
     average_value_Y = subdf.loc[:, 'Y-indel':'Y-GATA-H4'].mean(axis=1)
     # 将计算的平均值添加到A.AVG列
-    df['A.AVG'] = round(average_value_A)
-    df['Y.AVG'] = round(average_value_Y)  # Y.AVG平均值
-    df['A.STD'] = round(subdf.loc[:, 'CSF1PO':'vWA'].std(axis=1) / average_value_A, 2)
-    df['Y.STD'] = round(subdf.loc[:, 'Y-indel':'Y-GATA-H4'].std(axis=1) / average_value_Y, 2)
+    subdf['A.AVG'] = round(average_value_A)
+    subdf['Y.AVG'] = round(average_value_Y)  # Y.AVG平均值
+    subdf['A.STD'] = round(subdf.loc[:, 'CSF1PO':'vWA'].std(axis=1) / average_value_A, 2)
+    subdf['Y.STD'] = round(subdf.loc[:, 'Y-indel':'Y-GATA-H4'].std(axis=1) / average_value_Y, 2)
     #reads = df.loc[:, 'CSF1PO':'Y-GATA-H4'].mean(axis=1)
-    reads_df = df.loc[:, 'CSF1PO':'Y-GATA-H4']
-    A_avg = round(df['A.AVG'].mean())
-    Y_avg = round(df['Y.AVG'].mean())
-    A_std = round(df['A.STD'].mean(), 2)
-    Y_std = round(df['Y.STD'].mean(), 2)
+    # reads_df = subdf.loc[:, 'CSF1PO':'Y-GATA-H4'].copy()
+    A_avg = round(subdf['A.AVG'].mean())
+    Y_avg = round(subdf['Y.AVG'].mean())
+    A_std = round(subdf['A.STD'].mean(), 2)
+    Y_std = round(subdf['Y.STD'].mean(), 2)
 
     # 新增 STR 指标
     if 'STR_AVG' in subdf.columns:
@@ -120,7 +120,7 @@ def calculate_statistics(df1,project_tablet_name):
 
         # 返回结果字典
     return {
-        'project/tablet': project_tablet_name,
+        f'{classify_by}': project_tablet_name,
         '统计个数': lane_num,
         '总reads（M）': total_reads_M,
         '常位点（平均）': normal_avg,
@@ -148,7 +148,7 @@ except PermissionError:
     print(f"没有权限访问目录 {file_dir}。")
 # 调整后的列名（移除了不需要的列）
 columns = [
-    'project/tablet', '统计个数', '总reads（M）',
+    f'{classify_by}', '统计个数', '总reads（M）',
     '常位点（平均）','单个样本reads(M)',
     'STR reads占比', 'STR.AVG', 'STR.STD',
     'A.AVG','Y.AVG', 'A.STD', 'Y.STD'
@@ -166,6 +166,8 @@ if classify_by == "project":
     for proj in unique_projects:
         # 对 excel_dfs[0] 进行切片，筛选出当前 project 的数据
         df_slice = processor.df[processor.df["project"] == proj]
+        df_slice = df_slice[pd.to_numeric(df_slice.index, errors="coerce") < 1000]
+
         # 调用 calculate_statistics 对当前切片进行统计计算
         stats_result = calculate_statistics(df_slice,proj)
         df_result_sub = pd.DataFrame([stats_result])
@@ -181,6 +183,8 @@ elif classify_by == "tablet":
     for proj in unique_projects:
         # 对 excel_dfs[0] 进行切片，筛选出当前 project 的数据
         df_slice = processor.df[processor.df["tablet"] == proj]
+        df_slice = df_slice[pd.to_numeric(df_slice.index, errors="coerce") < 1000]
+
         # 调用 calculate_statistics 对当前切片进行统计计算
         stats_result = calculate_statistics(df_slice,proj)
         df_result_sub = pd.DataFrame([stats_result])
@@ -190,12 +194,13 @@ elif classify_by == "tablet":
         df_result = pd.concat([df_result, df_result_sub], axis=0, ignore_index=True)
 
 else:
-        stats_result = pd.DataFrame([calculate_statistics(processor.df, None)])  # 调用已定义的统计函数
+        df_slice = processor.df[pd.to_numeric(processor.df.index, errors="coerce") < 1000]
+        stats_result = pd.DataFrame([calculate_statistics(df_slice, None)])
         df_result = pd.concat([df_result, stats_result], axis=0, ignore_index=True)
 
 #shared_columns = df_genoDp.columns[1:].tolist()
 excel_name = os.path.splitext(os.path.basename(target_path))[0]
-df_results = processor.process_data_by_gene(classify_by,reads_df)
+df_results = processor.process_data_by_gene(classify_by,df.loc[:, 'CSF1PO':'Y-GATA-H4'])
 output_path = os.path.join(file_dir, f"{excel_name}_统计结果.xlsx")
 df_result.to_excel(output_path, index=False)
 output_path_split_table = os.path.join(file_dir, f"{excel_name}_统计结果分基因.xlsx")

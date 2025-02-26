@@ -119,7 +119,7 @@ class ExcelDataProcessor:
         excel_files = glob.glob(pattern, recursive=True)
 
         if not excel_files:
-            print(f"未在 {root_dir} 的子目录中找到包含“_idx_”的 Excel 文件")
+            print(f"未在 {root_dir} 的子目录中找到包含“_{idx}_”的 Excel 文件")
             return None
 
         df_list = []
@@ -139,18 +139,14 @@ class ExcelDataProcessor:
         except Exception as e:
             print(f"[错误] 读取文件 {excel_files} 时出错: {e}")
 
-        # df_merged = pd.concat(df_list, ignore_index=True)
-        #
-        # # 去除空值
-        # df_merged.dropna(inplace=True)
 
-        # 将“双峰比”列转换为字符串，去除百分号，并转换为浮点数
-        # df_merged["双峰比_clean"] = pd.to_numeric(
-        #     df_list["双峰比"].astype(str).str.replace("%", "").str.strip(),
-        #     errors="coerce"
-        # )
-
-        df_temp = df_temp.fillna('0').str.rstrip('%').astype(float)
+        # na_count = df_temp.isnull().sum()
+        # # 删除缺失值
+        # if na_count > 0:
+        #     print(f"已删除 {na_count} 个NA值")
+        df_temp = df_temp.dropna()
+        df_temp=df_temp.astype(str)
+        df_temp = df_temp.str.rstrip('%').astype(float)
         df_temp = df_temp[df_temp != 100]
         # 计算平均值
         avg_doublet = df_temp.mean()

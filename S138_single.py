@@ -7,6 +7,7 @@ from Excel_Data_Loader import ExcelDataProcessor
 # 禁用所有警告
 warnings.filterwarnings('ignore')
 target_path = input("请输入excel文件：")
+target_path = target_path.strip("'").strip('"')
 classify_by = input("请输入分类统计依据（project/tablet），留空表示不分类：").strip().lower()
 cut_num=input("请输入过滤低质量数据的STR_AVG阈值")
 sutter_cut_num=input("请输入过滤stutter高占比数阈值")
@@ -35,12 +36,27 @@ def calculate_statistics(subdf,project_tablet_name):
 
     if doublet_precent=="y":
         doublet_index = subdf.index
+        real_index=len(doublet_index)
+        doublet_avg=0
         for idx in doublet_index:
             avg = processor.process_doublet_precent(idx)
-            doublet_avg += avg
-        doublet_avg=round(doublet_avg/(len(doublet_index)),2)
+            if isinstance(avg, (float, np.float64)):
+                if np.isnan(avg):  # 检查 avg 是否为 NaN
+                    real_index -= 1  # 当 avg 为 NaN 时，减少有效的 real_index
+                    continue
+                else:
+                    doublet_avg += avg  # 累加有效的 avg
+            else:
+                real_index -= 1  # 如果 avg 不是浮动类型，认为其无效，减少 real_index
+                continue
+        if real_index > 0:
+            doublet_avg=round(doublet_avg/real_index,2)
+        else:
+            doublet_avg = 0
+        doublet_avg_str = str(doublet_avg) + '%'
     else:
-        doublet_avg=None
+        doublet_avg_str = 'N/A'
+
     # A_Typed / auto_loci_typed 平均值
     if 'A_Typed' in subdf.columns:
         normal_avg = round(subdf['A_Typed'].mean(), 2)
@@ -124,7 +140,7 @@ def calculate_statistics(subdf,project_tablet_name):
         '常位点（平均）': normal_avg,
         '单个样本reads(M)': sample_reads_avg,
         'STR reads占比': effect_reads_avg_percentage,
-        '常STR双峰比': str(doublet_avg.mean()) + '%',
+        '常STR双峰比': doublet_avg_str,
         'STR.AVG': str_avg,
         'STR.STD': str_std,
         'A.AVG': A_avg,
@@ -149,7 +165,7 @@ columns = [
     f'{classify_by}', '统计个数', '总reads（M）',
     '常位点（平均）','单个样本reads(M)',
     'STR reads占比', 'STR.AVG', 'STR.STD',
-    'A.AVG','Y.AVG', 'A.STD', 'Y.STD'
+    'A.AVG','Y.AVG', 'A.STD', 'Y.STD','常STR双峰比'
 ]
 
 
@@ -204,3 +220,4 @@ df_result.to_excel(output_path, index=False)
 output_path_split_table = os.path.join(file_dir, f"{excel_name}_统计结果分基因.xlsx")
 df_results.to_excel(output_path_split_table, index=False)
 print(f"S138统计结果已保存到 {output_path}")
+input("按任意键退出...")
